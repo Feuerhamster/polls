@@ -40,6 +40,7 @@ class Database{
 			id,
 			title,
 			author,
+			creationDate: new Date(),
 			options,
 			description,
 			isPublic,
@@ -79,6 +80,34 @@ class Database{
 
 						if(res && res._id){
 							delete res._id;
+						}
+
+						resolve(res);
+					}
+
+				});
+
+		});
+
+	}
+
+	static getFilteredPolls(filter){
+
+		return new Promise((resolve, reject) => {
+
+			Database.db
+				.collection("polls")
+				.find({ isPublic: true }).sort(filter).limit(5)
+				.toArray((err, res) => {
+
+					if(err){
+						reject(err);
+					}else{
+
+						if(res){
+							for(let i = 0; i < res.length; i++){
+								res[i] = Database.formatPollObject(res[i]);
+							}
 						}
 
 						resolve(res);
@@ -201,9 +230,9 @@ class Database{
 
 	}
 
-	static calculateResults(votes){
+	static calculateResults(votes, baseLength){
 
-		let result = [];
+		let result = new Array(baseLength).fill(0);
 
 		for(let vote of Object.values(votes)){
 
@@ -220,6 +249,25 @@ class Database{
 		}
 
 		return result;
+
+	}
+
+	static formatPollObject(poll){
+
+		delete poll._id
+		delete poll.token;
+
+		poll.views = poll.visitors.length;
+		delete poll.visitors;
+
+		poll.totalVotes = Object.keys(poll.votes).length;
+
+		poll.votes = Database.calculateResults(poll.votes, poll.options.length);
+
+		//poll.results = Object.assign(...poll.options.map((k, i) => ({[k]: poll.votes[i]})));
+
+
+		return poll;
 
 	}
 

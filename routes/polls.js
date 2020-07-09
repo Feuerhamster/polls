@@ -8,24 +8,30 @@ const validate = require("../services/validate");
 // import services
 const Database = require("../services/database");
 
-/*
-* Route to register a new user
-* */
+router.get("/", async (req, res) => {
+
+	let recent = await Database.getFilteredPolls({ creationDate: -1 });
+	let popular = await Database.getFilteredPolls({ visitors: -1 });
+
+	res.send({ recent, popular });
+
+});
+
 router.post("/", [
 
-	val("title").exists().withMessage("not_found").notEmpty().withMessage("not_found").isString().withMessage("not_a_string").isLength({ min: 5, max: 40 }).withMessage("out_of_range"),
-	val("description").exists().withMessage("not_found").notEmpty().withMessage("not_found").isString().withMessage("not_a_string").isLength({ min: 30, max: 600 }).withMessage("out_of_range"),
+	val("title").exists().withMessage("not_found").notEmpty().withMessage("not_found").isString().withMessage("not_a_string").isLength({ min: 5, max: 50 }).withMessage("out_of_range"),
+	val("description").optional().notEmpty().withMessage("not_found").isString().withMessage("not_a_string").isLength({ min: 30, max: 600 }).withMessage("out_of_range"),
 	val("author").exists().withMessage("not_found").notEmpty().withMessage("not_found").isString().withMessage("not_a_string").isLength({ min: 4, max: 40 }).withMessage("out_of_range"),
 	val("isPublic").exists().withMessage("not_found").notEmpty().withMessage("not_found").isBoolean().withMessage("not_a_boolean"),
 	val("isMultiple").exists().withMessage("not_found").notEmpty().withMessage("not_found").isBoolean().withMessage("not_a_boolean"),
-	val("options").exists().withMessage("not_found").notEmpty().withMessage("not_found").isArray({ min: 2, max: 8 }).withMessage("not_an_array"),
+	val("options").exists().withMessage("not_found").notEmpty().withMessage("not_found").isArray({ min: 2, max: 6 }).withMessage("invalid_array"),
 	validate
 
 ], async (req, res) => {
 
 	let result = await Database.createPoll(
 		req.body.title,
-		req.body.description,
+		req.body.description ? req.body.description : null,
 		req.body.author,
 		req.body.options,
 		req.body.isPublic,
@@ -72,12 +78,8 @@ router.get("/:id", async (req, res) => {
 		poll.voted = false;
 	}
 
-	poll.views = poll.visitors.length;
-	delete poll.visitors;
-	delete poll.token;
-
-	// calculate results
-	poll.votes = Database.calculateResults(poll.votes);
+	// Format object
+	poll = Database.formatPollObject(poll);
 
 	res.send(poll);
 
@@ -119,7 +121,7 @@ router.patch("/:id/votes", async (req, res) => {
 
 	// Check if the choice is right for the poll (check for multiple and indexes)
 	if(!Database.checkForValidChoices(poll, req.body)){
-		res.status(404).send({ error: 'invalid_choice' });
+		res.status(400).send({ error: 'invalid_option' });
 		return;
 	}
 
@@ -171,23 +173,14 @@ router.delete("/:id/votes", async (req, res) => {
 
 });
 
-router.delete("/:id", [
-	valQS("token").exists().withMessage("not_found"),
-	validate
-], async (req, res) => {
+router.delete("/:token", async (req, res) => {
 
 	// Get poll by id
-	let poll = await Database.getPoll({ id: req.params.id });
+	let poll = await Database.getPoll({ token: req.params.token });
 
 	// 404 if poll does not exist
 	if(!poll){
 		res.status(404).send({ error: 'not_found' });
-		return;
-	}
-
-	// Check permission with token
-	if(poll.token !== req.query.token){
-		res.status(401).send({ error: 'access_denied' });
 		return;
 	}
 
