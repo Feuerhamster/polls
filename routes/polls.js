@@ -20,7 +20,7 @@ router.get("/", async (req, res) => {
 router.post("/", [
 
 	val("title").exists().withMessage("not_found").notEmpty().withMessage("not_found").isString().withMessage("not_a_string").isLength({ min: 5, max: 50 }).withMessage("out_of_range"),
-	val("description").optional().notEmpty().withMessage("not_found").isString().withMessage("not_a_string").isLength({ min: 30, max: 600 }).withMessage("out_of_range"),
+	val("description").optional().notEmpty().withMessage("not_found").isString().withMessage("not_a_string").isLength({ min: 30, max: 500 }).withMessage("out_of_range"),
 	val("author").exists().withMessage("not_found").notEmpty().withMessage("not_found").isString().withMessage("not_a_string").isLength({ min: 4, max: 40 }).withMessage("out_of_range"),
 	val("isPublic").exists().withMessage("not_found").notEmpty().withMessage("not_found").isBoolean().withMessage("not_a_boolean"),
 	val("isMultiple").exists().withMessage("not_found").notEmpty().withMessage("not_found").isBoolean().withMessage("not_a_boolean"),
@@ -95,7 +95,7 @@ router.patch("/:id/votes", async (req, res) => {
 
 	// Return if is standalone api use and no custom id is provided
 	if(req.standaloneAPI && !req.customId){
-		res.status(400).send({ error: 'missing_custom_id' });
+		res.status(400).send({ error: 'missing_custom_id_header' });
 		return;
 	}
 
@@ -173,14 +173,23 @@ router.delete("/:id/votes", async (req, res) => {
 
 });
 
-router.delete("/:token", async (req, res) => {
+router.delete("/:id", [
+	valQS("token").exists().withMessage("not_found"),
+	validate
+], async (req, res) => {
 
 	// Get poll by id
-	let poll = await Database.getPoll({ token: req.params.token });
+	let poll = await Database.getPoll({ id: req.params.id });
 
 	// 404 if poll does not exist
 	if(!poll){
 		res.status(404).send({ error: 'not_found' });
+		return;
+	}
+
+	// Check permission with token
+	if(poll.token !== req.query.token){
+		res.status(403).send({ error: 'access_denied' });
 		return;
 	}
 

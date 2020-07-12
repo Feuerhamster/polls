@@ -37,14 +37,8 @@ app.use("/api/*", (req, res, next) => {
 })
 
 // load routes
-fs.readdirSync("./routes/").forEach((file) => {
-
-	let name = file.split(".")[0];
-	let route = require("./routes/" + file);
-
-	app.use("/api/" + name, route);
-
-});
+app.use("/api/polls", require("./routes/polls.js"));
+app.use(express.static("public"));
 
 // start server
 const server = app.listen(Config.config.web.port, () => {
